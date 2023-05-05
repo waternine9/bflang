@@ -1,3 +1,13 @@
+#include <stddef.h>
+#include <stdint.h>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <memory>
+#include <cstring>
+#include <algorithm>
+#include <string>
+
 typedef enum
 {
     BFASSIGN,
@@ -248,6 +258,7 @@ BFToken* BFTokenizeExpr(BFTokenizer* Tokenizer, BFScope* CurrentScope)
     {
         
         size_t NextMatching = BFTellNextMatching(Tokenizer, ')', '(');
+        
         if (NextMatching == 0xFFFFFFFF) 
         {
             return NULL;
@@ -264,26 +275,33 @@ BFToken* BFTokenizeExpr(BFTokenizer* Tokenizer, BFScope* CurrentScope)
         return Tok;
     }
 
-    
     size_t NextOp = BFFindNextOperator(Tokenizer);
     size_t NextSemi = BFTellNext(Tokenizer, ';');
     size_t NextBr = BFTellNext(Tokenizer, ')');
     size_t NextRSqrBr = BFTellNext(Tokenizer, ']');
     size_t NextCom = BFTellNext(Tokenizer, ',');
-    size_t NextSqrBr = BFTellNext(Tokenizer, '[');
     if (NextOp < NextBr) NextBr = NextOp;
     if (NextSemi < NextBr) NextBr = NextSemi;
     if (NextRSqrBr < NextBr) NextBr = NextRSqrBr;
     if (NextCom < NextBr) NextBr = NextCom;
-    if (NextSqrBr < NextBr) NextBr = NextSqrBr;
 
-    if (NextSqrBr == NextBr)
+    size_t NextSqrBr = BFTellNext(Tokenizer, '[');
+
+    if (NextSqrBr < NextBr && NextRSqrBr != 0xFFFFFFFF)
     {
-        size_t NextLBr = BFTellNext(Tokenizer, '(');
-        if (NextSqrBr < NextLBr)
-        {
-            return BFTokenizeFuncCall(Tokenizer, CurrentScope);
-        }        
+        if (NextOp != 0xFFFFFFFF) Tokenizer->At = NextOp + 1;
+        
+        
+        BFToken* MyTok = BFTokenizeFuncCall(Tokenizer, CurrentScope);
+        
+        if (NextRSqrBr == NextCom - 1 || NextRSqrBr == NextSemi - 1) return MyTok;
+
+        BFToken* SurroundToken = (BFToken*)malloc(sizeof(BFToken));
+        memset(SurroundToken, 0, sizeof(BFToken));
+        SurroundToken->First = MyTok;
+        Tokenizer->At = NextRSqrBr + 1;
+        SurroundToken->Second = BFTokenizeExpr(Tokenizer, CurrentScope);
+        return SurroundToken;        
     }
 
         
