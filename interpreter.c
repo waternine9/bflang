@@ -200,9 +200,13 @@ BFToken* BFTokenizeFuncCall(BFTokenizer* Tokenizer, BFScope* CurrentScope)
 
     
     Tokenizer->At = NextSqrBr + 1;
+
     size_t NextCom = BFTellNextCom(Tokenizer);
+
     if (NextSqrBr + 1 == NextMatchingSqrBr) return Token;
+
     bool BreakOut = false;
+
     while (1)
     {
         BFToken* Param = BFTokenizeExpr(Tokenizer, CurrentScope);
@@ -289,8 +293,6 @@ BFToken* BFTokenizeExpr(BFTokenizer* Tokenizer, BFScope* CurrentScope)
 
     if (NextSqrBr < NextBr && NextRSqrBr != 0xFFFFFFFF)
     {
-        if (NextOp != 0xFFFFFFFF) Tokenizer->At = NextOp + 1;
-        
         
         BFToken* MyTok = BFTokenizeFuncCall(Tokenizer, CurrentScope);
         
@@ -300,6 +302,8 @@ BFToken* BFTokenizeExpr(BFTokenizer* Tokenizer, BFScope* CurrentScope)
         memset(SurroundToken, 0, sizeof(BFToken));
         SurroundToken->First = MyTok;
         Tokenizer->At = NextRSqrBr + 1;
+        SurroundToken->Type = BFGetOpType(Tokenizer->Code[Tokenizer->At]);
+        Tokenizer->At++;
         SurroundToken->Second = BFTokenizeExpr(Tokenizer, CurrentScope);
         return SurroundToken;        
     }
@@ -385,6 +389,7 @@ void BFTokenizeFunction(BFTokenizer* Tokenizer)
     CurrentFunction->RootScope.Parent = 0;
     Tokenizer->At = NextSqrBr + 1;
     size_t NextSqrBr2 = BFTellNext(Tokenizer, ']');
+    
     if (NextSqrBr2 == 0xFFFFFFFF) return;
 
 
@@ -529,3 +534,4 @@ int BFRun(BFFunction** Funcs)
     }
     return 0;
 }
+
