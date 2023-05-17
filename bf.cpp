@@ -198,16 +198,6 @@ bool BFFindVariable(bf_name SearchFor, bf_scope* SearchIn, bf_variable** OutPtr)
 
 bf_token* BFTokenizeExpr(bf_tokenizer* Tokenizer, bf_scope* CurrentScope);
 
-bool BFGetStdFunction(bf_name x, bf_token_type &out)
-{
-    if (CStrEqualsWith((char*)x.Name, x.Len, "__print", 7))
-    {
-        out = BFPRINT;
-        return true;
-    }
-    return false;
-}
-
 bf_token* BFTokenizeFuncCall(bf_tokenizer* Tokenizer, bf_scope* CurrentScope)
 {
     bf_token* Token = (bf_token*)kmalloc(sizeof(bf_token));
@@ -219,12 +209,6 @@ bf_token* BFTokenizeFuncCall(bf_tokenizer* Tokenizer, bf_scope* CurrentScope)
     
     FuncName.Len = NextSqrBr - Tokenizer->At;
     FuncName.Name = Tokenizer->Code + Tokenizer->At;
-
-    bf_token_type tempType;
-    if (BFGetStdFunction(FuncName, tempType))
-    {
-        Token->Type = tempType;
-    }
 
     for (int I = 0; I < Tokenizer->BFNumFunctions; I++)
     {
@@ -247,7 +231,9 @@ bf_token* BFTokenizeFuncCall(bf_tokenizer* Tokenizer, bf_scope* CurrentScope)
 
     bool BreakOut = false;
 
-    while (1)
+    int Step = Token->CallFunction->Params.size;
+
+    while (Step--)
     {
         bf_token* Param = BFTokenizeExpr(Tokenizer, CurrentScope);
 
@@ -289,7 +275,7 @@ bool BFTokenizeType(bf_tokenizer *Tokenizer, bf_type &OutType)
             IsFound = true;
             break;
         }
-        else if (Tokenizer->Code[Tokenizer->At] == ';' || Tokenizer->Code[Tokenizer->At] == ')' || Tokenizer->Code[Tokenizer->At] == '(' || BFIsOpChar(Tokenizer->Code[Tokenizer->At]))
+        else if (Tokenizer->Code[Tokenizer->At] == ';' || Tokenizer->Code[Tokenizer->At] == ')' || Tokenizer->Code[Tokenizer->At] == ',' || Tokenizer->Code[Tokenizer->At] == '(' || BFIsOpChar(Tokenizer->Code[Tokenizer->At]))
         {
             Tokenizer->At++;
             IsFound = false;
@@ -919,7 +905,7 @@ void BFTokenizeFunction(bf_tokenizer* Tokenizer)
 
     CurrentFunction->RootScope.Vars = (bf_variable**)kmalloc(sizeof(bf_variable*));
     CurrentFunction->RootScope.ArgsCount = 0;
-    CurrentFunction->Params = LinkedList<String>();
+    CurrentFunction->Params = LinkedList<bf_type_name*>();
 
     if (NextSqrBr + 1 != NextSqrBr2)
     {
@@ -950,14 +936,25 @@ void BFTokenizeFunction(bf_tokenizer* Tokenizer)
             Var->Val = 0;
             if (IsTyped) Var->Type = OutType;
             else Var->Type = Types[0];
-            CurrentFunction->Params.PushBack(StrFromArray((char*)Var->Name.Name, Var->Name.Len));
+            bf_type_name *_Param = (bf_type_name*)malloc(sizeof(bf_type_name));
+            _Param->Name = String();
+            if (IsTyped) _Param->Type = OutType;
+            else _Param->Type = Types[0];
+
+            for (int I = 0;I < Var->Name.Len;I++)
+            {
+                _Param->Name.PushBack(Var->Name.Name[I]); 
+            }
+
+            CurrentFunction->Params.PushBack(_Param);
             CurrentFunction->RootScope.Vars[CurrentFunction->RootScope.ArgsCount++] = Var;
             bf_variable** NewArgs = (bf_variable**)kmalloc(sizeof(bf_variable*) * (CurrentFunction->RootScope.ArgsCount + 1));
             kmemcpy(NewArgs, CurrentFunction->RootScope.Vars, sizeof(bf_variable*) * CurrentFunction->RootScope.ArgsCount);
             kfree(CurrentFunction->RootScope.Vars);
             CurrentFunction->RootScope.Vars = NewArgs;
-            Tokenizer->At = NextCom + 1;
             if (BreakOut) break;
+            Tokenizer->At = NextCom + 1;
+            
 
         }
     }
@@ -1646,14 +1643,25 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
     else if (Tok->Type == BFFUNCCALL)
     {
         LinkedList<bf_compiled_token> passedCache;
-        for (int I = 0; I < Tok->NumParams; I++)
+        for (int I = 0; I < Tok->CallFunction->Params.size; I++)
         {
             DesiredType = Types[0];
             bf_compiled_token passed = BFCompileToken(Tok->Params[I], OutCode, Variables, jmpTo);
             passedCache.PushBack(passed);
-            if (!StrEqualsWith(passed.Type.Name, Tok->CallFunction->RootScope.Vars[I]->Type.Name))
+            if (!StrEqualsWith(passed.Type.Name, Tok->CallFunction->Params[I]->Type.Name))
             {
-                printf("compile: function call: FATAL! Argument type mismatch\n");
+                printf("compile: function call: FATAL! Argument type mismatch, got:\n");
+                printf("size: %i %i\n", passed.Type.Name.size, (int)Tok->CallFunction->Params.size);
+                for (int J = 0;J < passed.Type.Name.size;J++)
+                {
+                    printf("%c", passed.Type.Name[J]);
+                }
+                printf("\n");
+                for (int J = 0;J < Tok->CallFunction->Name.Len;J++)
+                {
+                    printf("%c", Tok->CallFunction->Name.Name[J]);
+                }
+                printf("\n");
                 return { StrFromCStr(""), Types[0] };
             }
             if (passed.Type.IsStruct)
@@ -1664,7 +1672,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     Dest.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 Dest.PushBack('.');
-                Dest = StrAppend(Dest, Tok->CallFunction->Params[I]);
+                Dest = StrAppend(Dest, Tok->CallFunction->Params[I]->Name);
                 BFCompileStructCopy(Dest, passed.Asm, passed.Type, OutCode);
             }
             if (passed.Type.Bits == BFBITS8)
@@ -1678,7 +1686,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     sParam.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 sParam.PushBack('.');
-                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]);
+                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]->Name);
                 sParam = StrAppend(sParam, StrFromCStr("], al"));
                 OutCode.PushBack(sParam);
             }
@@ -1693,7 +1701,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     sParam.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 sParam.PushBack('.');
-                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]);
+                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]->Name);
                 sParam = StrAppend(sParam, StrFromCStr("], ax"));
                 OutCode.PushBack(sParam);
             }
@@ -1708,7 +1716,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     sParam.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 sParam.PushBack('.');
-                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]);
+                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]->Name);
                 sParam = StrAppend(sParam, StrFromCStr("], eax"));
                 OutCode.PushBack(sParam);
             }
@@ -1717,7 +1725,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
         output = StrAppend(output, StrFromArray((char*)Tok->CallFunction->Name.Name, Tok->CallFunction->Name.Len));
         OutCode.PushBack(output);
 
-        for (int I = 0; I < Tok->NumParams; I++)
+        for (int I = 0; I < Tok->CallFunction->Params.size; I++)
         {
             bf_compiled_token passed = passedCache[I];
             if (!Tok->CallFunction->RootScope.Vars[I]->Ref) continue;
@@ -1729,7 +1737,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     Dest.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 Dest.PushBack('.');
-                Dest = StrAppend(Dest, Tok->CallFunction->Params[I]);
+                Dest = StrAppend(Dest, Tok->CallFunction->Params[I]->Name);
                 BFCompileStructCopy(passed.Asm, Dest, passed.Type, OutCode);
             }
             if (passed.Type.Bits == BFBITS8)
@@ -1740,7 +1748,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     sParam.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 sParam.PushBack('.');
-                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]);
+                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]->Name);
                 sParam.PushBack(']');
                 OutCode.PushBack(sParam);
                 sParam = StrFromCStr("mov ");
@@ -1756,7 +1764,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     sParam.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 sParam.PushBack('.');
-                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]);
+                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]->Name);
                 sParam.PushBack(']');
                 OutCode.PushBack(sParam);
                 sParam = StrFromCStr("mov ");
@@ -1772,7 +1780,7 @@ bf_compiled_token BFCompileToken(bf_token* Tok, LinkedList<String> &OutCode, Lin
                     sParam.PushBack(Tok->CallFunction->Name.Name[I]);
                 }
                 sParam.PushBack('.');
-                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]);
+                sParam = StrAppend(sParam, Tok->CallFunction->Params[I]->Name);
                 sParam.PushBack(']');
                 OutCode.PushBack(sParam);
                 sParam = StrFromCStr("mov ");
@@ -1915,7 +1923,7 @@ void BFCompileFunc(bf_function* Func, LinkedList<String> &OutCode)
     LinkedList<String> Variables;
     for (int i = 0;i < Func->Params.size;i++)
     {
-        Variables.PushBack(Func->Params[i]);
+        Variables.PushBack(Func->Params[i]->Name);
     }
     FuncReturnType = Func->Type;
     int tempVarCount = 0;
