@@ -1,4 +1,4 @@
-# What BFLang
+# What is BFLang
 BFLang is designed to be an improved, cleaner version of C.
 BFLang currently compiles to only 64-bit NASM-compatible assembly for Linux (windows support in future update.)
 
