@@ -187,3 +187,96 @@ _start()
     };
 }
 ```
+## Triangle rasterizer
+```txt
+vec2 {
+    int:x;
+    int:y;
+}
+
+int:vecSub(&vec2:z, vec2:w)
+{
+    z.x = z.x - w.x;
+    z.y = z.y - w.y;
+}
+
+int:vecDot(vec2:x, vec2:y)
+{
+    int:mX = (x.x * y.x) / 256;
+    int:mY = (x.y * y.y) / 256;
+    return(mX + mY);
+}
+
+int:barycentric(vec2:p0, vec2:p1, vec2:p2, vec2:p, &int:u, &int:v, &int:w)
+{
+    vec2:v0 = p1;
+    vec2:v1 = p2;
+    vec2:v2 = p;
+    vecSub(v0, p0);
+    vecSub(v1, p0);
+    vecSub(v2, p0);
+    int:d00 = vecDot(v0, v0);
+    int:d01 = vecDot(v0, v1);
+    int:d11 = vecDot(v1, v1);
+    int:d20 = vecDot(v2, v0);
+    int:d21 = vecDot(v2, v1);
+    int:denom = (((d00 * d11) / 256) - ((d01 * d01) / 256));
+    u = (d11 * d20) / 256;
+    u = u - ((d01 * d21) / 256);
+    u = (u * 256) / denom;
+    v = (d00 * d21) >> 8;
+    v = v - ((d01 * d20) / 256);
+    v = (v * 256) / denom;
+    w = (((1 * 256) - u) - v);
+}
+
+int:_start()
+{
+    vec2:p0;
+    vec2:p1;
+    vec2:p2;
+    vec2:p;
+    p0.x = 4 << 8;
+    p0.y = 4 << 8;
+    p1.x = 16 << 8;
+    p1.y = 4 << 8;
+    p2.x = 6 << 8;
+    p2.y = 16 << 8;
+    for (int:i = 0;i < 20;i = i + 1)
+    {
+        for (int:j = 0;j < 20;j = j + 1)
+        {
+            int:u = 0;
+            int:v = 0;
+            int:w = 0;
+            p.x = j << 8;
+            p.y = i << 8;
+            barycentric(p0, p1, p2, p, u, v, w);
+            if (u > 0)
+            {
+                if (v > 0)
+                {
+                    if ((u + v) < (1 << 8))
+                    {
+                        print(49);
+                    };
+                    if ((u + v) > ((1 << 8) - 1))
+                    {
+                        print(48);
+                    };
+                };
+                if (v < 1)
+                {
+                    print(48);
+                };
+            };
+            if (u < 1)
+            {
+                print(48);
+            };
+        };
+        print(10);
+    };
+}
+```
+
