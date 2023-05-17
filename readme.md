@@ -72,7 +72,7 @@ Also, functions can **only be defined in the top-level of your code**, just like
 
 ### References
 
-References in BF act just like how they would in C.
+References in BF act just like how they would in C++.
 You can specify that you want a parameter to be passed by reference, using `&` like so:
 ```txt
 int:AddOne(&int:toBePassedByReference)
