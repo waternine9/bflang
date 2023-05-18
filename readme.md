@@ -370,3 +370,77 @@ int:_start()
     };
 }
 ```
+## Triangle rasterizer v2.0
+```txt
+vec3 {
+    float:x;
+    float:y;
+}
+
+int:_start()
+{
+    vec3:p0;
+    vec3:p1;
+    vec3:p2;
+    p0.x = cast(float:10);
+    p0.y = cast(float:10);
+    p1.x = cast(float:90);
+    p1.y = cast(float:40);
+    p2.x = cast(float:50);
+    p2.y = cast(float:90);
+    int[10000]:framebuff;
+    float:s0 = (p2.x - p0.x) / (p2.y - p0.y);
+    float:s1 = (p1.x - p0.x) / (p1.y - p0.y);
+    float:x0 = p0.x;
+    float:x1 = p0.x;
+    float:y = p0.y;
+    while (cast(int:y) < cast(int:p1.y))
+    {
+        int:startX0 = cast(int:x0);
+        int:startX1 = cast(int:x1);
+        if (startX1 < startX0)
+        {
+            int:temp = startX0;
+            startX0 = startX1;
+            startX1 = temp;
+        };
+        while (startX0 < startX1 + 1)
+        {
+            framebuff[startX0 + 100 * cast(int:y)] = 1;
+            startX0 = startX0 + 1;
+        };
+        x0 = x0 + s0;
+        x1 = x1 + s1;
+        y = y + cast(float:1);
+    };
+    s1 = (p2.x - p1.x) / (p2.y - p1.y);
+    while (cast(int:y) < cast(int:p2.y) + 1)
+    {
+        int:startX0 = cast(int:x0);
+        int:startX1 = cast(int:x1);
+        if (startX1 < startX0)
+        {
+            int:temp = startX0;
+            startX0 = startX1;
+            startX1 = temp;
+        };
+        while (startX0 < startX1 + 1)
+        {
+            framebuff[startX0 + 100 * cast(int:y)] = 1;
+            startX0 = startX0 + 1;
+        };
+        x0 = x0 + s0;
+        x1 = x1 + s1;
+        y = y + cast(float:1);
+    };
+    for (int:i = 0;i < 100;i = i + 1)
+    {
+        for (int:j = 0;j < 100;j = j + 1)
+        {
+            
+            print(48 + framebuff[j + 100 * i]);
+        };
+        print(10);
+    };
+}
+```
