@@ -279,4 +279,94 @@ int:_start()
     };
 }
 ```
+## Spinning donut
+```txt
+int:cos(int:x)
+{
+    int:modX = x % (1 << 10);
+    int:modX2 = x % (2 << 10);
+    int:result = 4 * (modX - ((modX * modX) >> 10));
+    if (modX2 > (1 << 10))
+    {
+        return(result * ~1);
+    };
+    return(result);
+}
 
+int:sin(int:x)
+{
+    x = x + (3 << 9);
+    return(cos(x););
+}
+
+int:_start()
+{
+    int[1600]:framebuff;
+    int[1600]:depthbuff;
+    int:A = 0;
+    int:B = 0;
+    while (1 < 2)
+    {
+        for (int:__Count = 0;__Count < 1600;__Count = __Count + 1)
+        {
+            framebuff[__Count] = 0;
+            depthbuff[__Count] = ~1000000;
+        };
+        for (int:theta = 0;theta < 2000;theta = theta + 4)
+        {
+            for (int:phi = 0;phi < 2000;phi = phi + 4)
+            {
+                
+                int:nx1 = cos(phi);
+                int:ny1 = sin(phi);
+                int:y1 = (ny1 * 5) + (10 << 10);
+                int:z1 = nx1 * 5;
+                int:x1 = 0;
+
+                int:rx1 = ((x1 * cos(theta)) >> 10) - ((y1 * sin(theta)) >> 10); 
+                int:ry1 = ((x1 * sin(theta)) >> 10) + ((y1 * cos(theta)) >> 10); 
+                ny1 = ((ny1 * cos(theta)) >> 10); 
+
+                int:ry2 = ((z1 * sin(A)) >> 10) + ((ry1 * cos(A)) >> 10); 
+                int:rz2 = ((z1 * cos(A)) >> 10) - ((ry1 * sin(A)) >> 10); 
+                
+                int:ry3 = ((rx1 * sin(B)) >> 10) + ((ry2 * cos(B)) >> 10); 
+                int:rx3 = ((rx1 * cos(B)) >> 10) - ((ry2 * sin(B)) >> 10); 
+
+                if (depthbuff[(20 + rx3 >> 10) + 40 * (20 + ry3 >> 10)] < rz2)
+                {
+                    depthbuff[(20 + rx3 >> 10) + 40 * (20 + ry3 >> 10)] = rz2;
+                    if (ny1 < 0)
+                    {
+                        ny1 = 1 << 7;
+                    };
+                    framebuff[(20 + rx3 >> 10) + 40 * (20 + ry3 >> 10)] = ny1 >> 7;
+                        
+                };
+            };
+        };
+        for (int:y = 0;y < 40;y = y + 1)
+        {
+            for (int:x = 0;x < 40;x = x + 1)
+            {
+                if (framebuff[x + y * 40] > 1)
+                {
+                    print(48 + framebuff[x + y * 40]);
+                };
+                if (framebuff[x + y * 40] == 0)
+                {
+                    print(32);
+                };
+                if (framebuff[x + y * 40] == 1)
+                {
+                    print(95);
+                };
+            };
+            print(10);
+        };
+        A = A + 40;
+        B = B + 16;
+        print(10);
+    };
+}
+```
